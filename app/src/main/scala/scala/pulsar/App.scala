@@ -5,6 +5,8 @@ import com.sksamuel.avro4s._
 import org.apache.pulsar.client.api.Schema
 import org.apache.pulsar.client.impl.schema.AvroSchema
 import org.apache.pulsar.common.schema.KeyValue
+import util.control.Breaks._
+
 
 object App {
   def main(args: Array[String]): Unit = {
@@ -19,8 +21,22 @@ object App {
     val consumer = client.consumer(ConsumerConfig(Subscription("mysubs"), List(topic)))
     consumer.seek(MessageId.earliest)
     while (true) {
-      val message = consumer.receive
-      println(message.toString)
+      breakable {
+        val message = consumer.receive
+        println(s"Got message ${message}")
+        if (message.isFailure) {
+          println(s"ConsumerMessage failed, failure was ${message.failed.get}")
+          break
+        } else  {
+          val innerMessage = message.get.valueTry
+          if (innerMessage.isFailure) {
+            println(s"innerMessage failed, failure was ${innerMessage.failed.get}")
+            break
+          } else {
+            println(s"innerMessage succeeded, values were ${innerMessage.get.getKey}: ${innerMessage.get.getValue}")
+          }
+        }
+      }
     }
   }
 }
